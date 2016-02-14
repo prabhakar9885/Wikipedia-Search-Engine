@@ -10,7 +10,6 @@ public class UtilFuncs {
 	private static Stemmer stemmer = new Stemmer();
 	private static StopWords sw = new StopWords();
 
-
 	/***
 	 * Convert a Posting into PageInfo Object
 	 * 
@@ -19,6 +18,7 @@ public class UtilFuncs {
 	 * @return
 	 */
 	public static ArrayList<PageInfo> getPostingListAsPageInfoList(String posting, String fieldQueryTerms) {
+
 		String[] list1 = posting.split("\\|");
 		StringBuilder sbTemp = new StringBuilder();
 		ArrayList<PageInfo> pageInfoList = new ArrayList<PageInfo>();
@@ -30,9 +30,6 @@ public class UtilFuncs {
 
 			String postingStr = list1[i];
 			int len = postingStr.length();
-
-			if (list1[i].contains("10331"))
-				i = i;
 
 			int indexOfDelimitter = postingStr.indexOf('-', 0);
 			PageInfo pi = new PageInfo();

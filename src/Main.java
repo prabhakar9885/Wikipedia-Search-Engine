@@ -30,6 +30,8 @@ public class Main {
 	static HashSet<String> queryTermsStemmed = new HashSet<String>();
 	static HashMap<String, String> fieldQueryTerms = new HashMap();
 	static private Map<String, String> sortedMapping = new LinkedHashMap<>();
+	static ArrayList<ArrayList<PageInfo>> tempPostingList = new ArrayList<ArrayList<PageInfo>>();
+	static RandomAccessFile randomAccessFile;
 
 	public static void main(String[] args) throws IOException {
 
@@ -42,6 +44,7 @@ public class Main {
 		String pathToPostings = args[0] + (args[0].endsWith("/") ? "postings" : "/postings");
 
 		loadIndexIntoHashMap(pathToPrimaryIndex, pathToSecondaryIndex);
+		randomAccessFile = new RandomAccessFile(pathToPostings, "r");
 
 		while (true) {
 			System.out.print("Query String: ");
@@ -79,6 +82,7 @@ public class Main {
 			System.out.println("Service time: " + (System.currentTimeMillis() - lStartTime) + " ms");
 		}
 		scn.close();
+		randomAccessFile.close();
 	}
 
 	/***
@@ -140,8 +144,6 @@ public class Main {
 	 */
 	private static void searchForQuery(String pathToPostings) throws IOException {
 
-		RandomAccessFile randomAccessFile = new RandomAccessFile(pathToPostings, "r");
-		ArrayList<PageInfo> top10postings = new ArrayList<PageInfo>();
 		Map<String, String> termPostsMapping = new LinkedHashMap<String, String>();
 
 		for (String term : queryTermsStemmed) {
@@ -165,9 +167,8 @@ public class Main {
 			i++;
 		}
 		System.out.println();
-		intersection.clear();
 
-		randomAccessFile.close();
+		tempPostingList.clear();
 	}
 
 	/***
@@ -180,13 +181,14 @@ public class Main {
 		if (termPostsMapping.size() == 0)
 			return null;
 
-		ArrayList<ArrayList<PageInfo>> tempPostingList = new ArrayList<ArrayList<PageInfo>>();
 		String[] keys = new String[termPostsMapping.size()];
 		termPostsMapping.keySet().toArray(keys);
 
-		for (int i = 0; i < keys.length; i += 1) {
-			ArrayList<PageInfo> list1 = UtilFuncs.getPostingListAsPageInfoList(termPostsMapping.get(keys[i]),
-					fieldQueryTerms.get(keys[i]));
+		// Convert termsPostingMapping into tempPostingList(which holds PageInfo
+		// Obj)
+		for (Map.Entry<String, String> map : termPostsMapping.entrySet()) {
+			ArrayList<PageInfo> list1 = UtilFuncs.getPostingListAsPageInfoList(termPostsMapping.get(map.getKey()),
+					fieldQueryTerms.get(map.getKey()));
 			tempPostingList.add(list1);
 		}
 
@@ -196,6 +198,7 @@ public class Main {
 
 		ArrayList<PageInfo> list1 = tempPostingList.get(0);
 
+		// Perform Intersection of all the posting lists
 		for (int i = 1; i < tempPostingList.size(); i++) {
 			ArrayList<PageInfo> ans = new ArrayList<PageInfo>();
 			ArrayList<PageInfo> list2 = tempPostingList.get(i);
