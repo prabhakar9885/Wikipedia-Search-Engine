@@ -3,15 +3,18 @@ import java.io.FileNotFoundException;
 import java.io.FileReader;
 import java.io.IOException;
 import java.io.RandomAccessFile;
+import java.nio.ByteBuffer;
+import java.nio.channels.SeekableByteChannel;
+import java.nio.charset.Charset;
+import java.nio.file.Files;
+import java.nio.file.Paths;
+import java.nio.file.StandardOpenOption;
 import java.util.ArrayList;
-import java.util.Comparator;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.Map;
-import java.util.Map.Entry;
 import java.util.Scanner;
-import java.util.stream.Stream;
 
 import SharedLibs.PageInfo;
 import SharedLibs.Stemmer;
@@ -28,10 +31,14 @@ public class Main {
 	static private HashMap<String, Long> primaryIndex = new HashMap<String, Long>();
 	static private HashMap<String, Long> secondaryIndex = new HashMap<String, Long>();
 	static HashSet<String> queryTermsStemmed = new HashSet<String>();
-	static HashMap<String, String> fieldQueryTerms = new HashMap();
-	static private Map<String, String> sortedMapping = new LinkedHashMap<>();
+	static HashMap<String, String> fieldQueryTerms = new HashMap<String, String>();
 	static ArrayList<ArrayList<PageInfo>> tempPostingList = new ArrayList<ArrayList<PageInfo>>();
 	static RandomAccessFile randomAccessFile;
+	static SeekableByteChannel sbc;
+	static StringBuilder sbTemp = new StringBuilder();
+	static ByteBuffer bf = ByteBuffer.allocate(1024);
+	static String pathToPostings;
+	static String encoding = System.getProperty("file.encoding");
 
 	public static void main(String[] args) throws IOException {
 
@@ -41,10 +48,10 @@ public class Main {
 		String pathToPrimaryIndex = args[0] + (args[0].endsWith("/") ? "index.PrimaryIndex" : "/index.PrimaryIndex");
 		String pathToSecondaryIndex = args[0]
 				+ (args[0].endsWith("/") ? "index.SecondaryIndex" : "/index.SecondaryIndex");
-		String pathToPostings = args[0] + (args[0].endsWith("/") ? "postings" : "/postings");
+		pathToPostings = args[0] + (args[0].endsWith("/") ? "postings" : "/postings");
 
 		loadIndexIntoHashMap(pathToPrimaryIndex, pathToSecondaryIndex);
-		randomAccessFile = new RandomAccessFile(pathToPostings, "r");
+		// randomAccessFile = new RandomAccessFile(pathToPostings, "r");
 
 		while (true) {
 			System.out.print("Query String: ");
@@ -82,7 +89,8 @@ public class Main {
 			System.out.println("Service time: " + (System.currentTimeMillis() - lStartTime) + " ms");
 		}
 		scn.close();
-		randomAccessFile.close();
+		// randomAccessFile.close();
+		sbc.close();
 	}
 
 	/***
@@ -150,8 +158,7 @@ public class Main {
 			if (!primaryIndex.containsKey(term))
 				continue;
 			long bytePositionInPostingsFile = primaryIndex.get(term);
-			randomAccessFile.seek(bytePositionInPostingsFile);
-			String posts = randomAccessFile.readLine();
+			String posts = getPostingListFromPrimIndexFile(bytePositionInPostingsFile);
 			termPostsMapping.put(term, posts.substring(posts.indexOf(":") + 1));
 		}
 
@@ -169,6 +176,29 @@ public class Main {
 		System.out.println();
 
 		tempPostingList.clear();
+	}
+
+	private static String getPostingListFromPrimIndexFile(long bytePositionInPostingsFile) throws IOException {
+		// randomAccessFile.seek(bytePositionInPostingsFile);
+		sbc = Files.newByteChannel(Paths.get(pathToPostings), StandardOpenOption.READ);
+
+		sbc.position(bytePositionInPostingsFile);
+		sbTemp.setLength(0);
+		bf.clear();
+		String str = null;
+
+		while (sbc.read(bf) > 0) {
+			bf.flip();
+			str = Charset.forName(encoding).decode(bf).toString();
+			if (str.contains("\n")) {
+				sbTemp.append(str.substring(0, str.indexOf('\n')));
+				break;
+			} else
+				sbTemp.append(str);
+			bf.rewind();
+		}
+		sbc.close();
+		return sbTemp.toString();
 	}
 
 	/***
